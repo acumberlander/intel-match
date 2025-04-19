@@ -2,22 +2,16 @@
 
 import { useState } from "react";
 import axios from "axios";
-
-type SearchResult = {
-  id: string;
-  description: string;
-  similarity: number;
-  name?: string; // For people
-  age?: number;
-  make?: string; // For vehicles
-  model?: string;
-  color?: string;
-};
+import { SearchResult } from "../types/SearchResult";
+import { Person } from "../types/Person";
+import PeopleList from "./PeopleList";
+import VehiclesList from "./VehicleList";
 
 export default function SearchForm() {
   const [query, setQuery] = useState("");
   const [people, setPeople] = useState<SearchResult[]>([]);
   const [vehicles, setVehicles] = useState<SearchResult[]>([]);
+  const [sensitivity, setSensitivity] = useState(0.7);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -28,9 +22,10 @@ export default function SearchForm() {
     try {
       const res = await axios.post("http://localhost:5001/search", {
         query,
+        sensitivity,
       });
-      setPeople(res.data.topPeople);
-      setVehicles(res.data.topVehicles);
+      setPeople(res.data.topPeople.slice(0, 5));
+      setVehicles(res.data.topVehicles.slice(0, 5));
     } catch (err: any) {
       setError(err?.response?.data?.message || "Something went wrong");
     } finally {
@@ -39,7 +34,7 @@ export default function SearchForm() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto p-6">
+    <div className="px-12 mx-auto p-6">
       <form onSubmit={handleSubmit} className="space-y-4">
         <textarea
           value={query}
@@ -48,6 +43,21 @@ export default function SearchForm() {
           placeholder="Describe a person or vehicle..."
           rows={4}
         />
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Sensitivity: {sensitivity.toFixed(2)}
+          </label>
+          <input
+            type="range"
+            min={0.1}
+            max={1.0}
+            step={0.05}
+            value={sensitivity}
+            onChange={(e) => setSensitivity(parseFloat(e.target.value))}
+            className="w-full"
+          />
+        </div>
+
         <button
           type="submit"
           className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition"
@@ -59,48 +69,23 @@ export default function SearchForm() {
       {loading && <p className="mt-4 text-gray-600">Searching...</p>}
       {error && <p className="mt-4 text-red-600">{error}</p>}
 
-      <div className="mt-6">
+      <div className="flex justify-between items-center">
         {people.length > 0 && (
-          <>
-            <h2 className="text-lg font-semibold mb-2">Top Matching People</h2>
-            <ul className="space-y-2">
-              {people.map((p) => (
-                <li key={p.id} className="border p-3 rounded bg-gray-50">
-                  <p>
-                    <strong>{p.name}</strong> ({p.age})
-                  </p>
-                  <p className="text-sm">{p.description}</p>
-                  <p className="text-xs text-gray-500">
-                    Similarity: {p.similarity?.toFixed(3)}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          </>
+          <div className="flex flex-col">
+            <h2 className="text-lg font-semibold mt-6 mb-2">
+              Top Matching People
+            </h2>
+            <PeopleList people={people} />
+          </div>
         )}
 
         {vehicles.length > 0 && (
-          <>
+          <div className="flex flex-col">
             <h2 className="text-lg font-semibold mt-6 mb-2">
               Top Matching Vehicles
             </h2>
-            <ul className="space-y-2">
-              {vehicles.map((v) => (
-                <li key={v.id} className="border p-3 rounded bg-gray-50">
-                  <p>
-                    <strong>
-                      {v.make} {v.model}
-                    </strong>{" "}
-                    ({v.color})
-                  </p>
-                  <p className="text-sm">{v.description}</p>
-                  <p className="text-xs text-gray-500">
-                    Similarity: {v.similarity?.toFixed(3)}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          </>
+            <VehiclesList vehicles={vehicles} />
+          </div>
         )}
       </div>
     </div>

@@ -5,7 +5,7 @@ export const searchEntities = async (
   req: Request,
   res: Response
 ): Promise<void> => {
-  const { query } = req.body;
+  const { query, sensitivity } = req.body;
 
   if (!query || query.trim().length < 3) {
     res
@@ -14,8 +14,13 @@ export const searchEntities = async (
     return;
   }
 
+  const minSimilarity = Math.max(
+    0.0,
+    Math.min(1.0, Number(sensitivity) || 0.7)
+  );
+
   try {
-    const results = await searchByEmbedding(query);
+    const results = await searchByEmbedding(query, minSimilarity);
     res.json(results);
   } catch (error) {
     console.error("Search error:", error);

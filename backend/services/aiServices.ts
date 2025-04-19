@@ -1,6 +1,6 @@
 import { OpenAI } from "openai";
-import { personData } from "../models/personModel";
-import { vehicleData } from "../models/vehicleModel";
+import { PersonModel } from "../models/personModel";
+import { VehicleModel } from "../models/vehicleModel";
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -41,24 +41,27 @@ const cosineSimilarity = (a: number[], b: number[]): number => {
 /**
  * Compare query vector against pre-embedded person & vehicle descriptions
  */
-export const searchByEmbedding = async (query: string) => {
+export const searchByEmbedding = async (query: string, minSimilarity = 0.7) => {
   const queryEmbedding = await generateEmbedding(query);
 
-  const topPeople = personData
+  const people = await PersonModel.find({});
+  const vehicles = await VehicleModel.find({});
+
+  const topPeople = people
     .map((person) => ({
-      ...person,
+      ...person.toObject(),
       similarity: cosineSimilarity(queryEmbedding, person.embedding),
     }))
-    .sort((a, b) => b.similarity - a.similarity)
-    .slice(0, 3);
+    .filter((p) => p.similarity >= minSimilarity)
+    .sort((a, b) => b.similarity - a.similarity);
 
-  const topVehicles = vehicleData
+  const topVehicles = vehicles
     .map((vehicle) => ({
-      ...vehicle,
+      ...vehicle.toObject(),
       similarity: cosineSimilarity(queryEmbedding, vehicle.embedding),
     }))
-    .sort((a, b) => b.similarity - a.similarity)
-    .slice(0, 3);
+    .filter((v) => v.similarity >= minSimilarity)
+    .sort((a, b) => b.similarity - a.similarity);
 
   return { topPeople, topVehicles };
 };
