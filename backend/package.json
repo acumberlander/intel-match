@@ -9,7 +9,8 @@
     "openai": "^4.95.1"
   },
   "scripts": {
-    "dev": "ts-node-dev ./server.ts"
+    "dev": "ts-node-dev ./server.ts",
+    "update-data": "ts-node scripts/updateData.ts"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",

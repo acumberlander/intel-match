@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 import personRoutes from "./routes/personRoutes";
 import vehicleRoutes from "./routes/vehicleRoutes";
 import searchRoutes from "./routes/searchRoutes";
+import crimeRoutes from "./routes/crimeRoutes";
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -17,8 +18,9 @@ app.use(express.json());
 
 // Routes
 app.use("/people", personRoutes);
-app.use("vehicles", vehicleRoutes);
+app.use("/vehicles", vehicleRoutes);
 app.use("/search", searchRoutes);
+app.use("/crimes", crimeRoutes);
 
 // Connect to MongoDB
 mongoose

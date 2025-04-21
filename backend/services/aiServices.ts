@@ -1,6 +1,9 @@
 import { OpenAI } from "openai";
 import { PersonModel } from "../models/personModel";
 import { VehicleModel } from "../models/vehicleModel";
+import { DescriptionType } from "../types/types";
+import { cosineSimilarity } from "../utils/utils";
+import { MatchedPerson, MatchedVehicleOnly } from "../types/types";
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -27,41 +30,156 @@ export const generateEmbedding = async (text: string): Promise<number[]> => {
   }
 };
 
-
 /**
- * Computes cosine similarity between two vectors
+ * Searches for people based on the query and sensitivity.
+ * @param query 
+ * @param sensitivity 
+ * @returns 
  */
-const cosineSimilarity = (a: number[], b: number[]): number => {
-  const dot = a.reduce((sum, val, i) => sum + val * b[i], 0);
-  const magA = Math.sqrt(a.reduce((sum, val) => sum + val * val, 0));
-  const magB = Math.sqrt(b.reduce((sum, val) => sum + val * val, 0));
-  return dot / (magA * magB);
+export const searchPeopleOnly = async (
+  query: string,
+  sensitivity: number = 0.7
+): Promise<MatchedPerson[]> => {
+  const embedding = await generateEmbedding(query);
+  const people = await PersonModel.find({
+    crimeHistory: { $exists: true, $not: { $size: 0 } },
+  });
+
+  const results: MatchedPerson[] = people
+    .map((person): MatchedPerson => {
+      const score = cosineSimilarity(embedding, person.embedding);
+      return {
+        _id: person._id.toString(),
+        name: person.name,
+        age: person.age,
+        description: person.description,
+        crimeHistory: person.crimeHistory,
+        similarity: score,
+        vehicleBoost: 0,
+        finalScore: score,
+        matchedVehicles: [],
+      };
+    })
+    .filter((p) => p.similarity >= sensitivity)
+    .sort((a, b) => b.similarity - a.similarity)
+    .slice(0, 5);
+
+  return results;
 };
 
-/**
- * Compare query vector against pre-embedded person & vehicle descriptions
- */
-export const searchByEmbedding = async (query: string, minSimilarity = 0.7) => {
-  const queryEmbedding = await generateEmbedding(query);
 
-  const people = await PersonModel.find({});
+/**
+ * Searches for vehicles based on the query and sensitivity.
+ * @param query 
+ * @param sensitivity 
+ * @returns 
+ */
+export const searchVehiclesOnly = async (
+  query: string,
+  sensitivity: number = 0.7
+): Promise<MatchedVehicleOnly[]> => {
+  const embedding = await generateEmbedding(query);
   const vehicles = await VehicleModel.find({});
 
-  const topPeople = people
-    .map((person) => ({
-      ...person.toObject(),
-      similarity: cosineSimilarity(queryEmbedding, person.embedding),
-    }))
-    .filter((p) => p.similarity >= minSimilarity)
-    .sort((a, b) => b.similarity - a.similarity);
+  return vehicles
+    .map(
+      (v): MatchedVehicleOnly => ({
+        _id: v._id.toString(),
+        make: v.make,
+        model: v.model,
+        color: v.color,
+        similarity: cosineSimilarity(embedding, v.embedding),
+        isStolen: v.isStolen,
+      })
+    )
+    .filter((v) => v.similarity >= sensitivity)
+    .sort((a, b) => b.similarity - a.similarity)
+    .slice(0, 5);
+};
 
-  const topVehicles = vehicles
-    .map((vehicle) => ({
-      ...vehicle.toObject(),
-      similarity: cosineSimilarity(queryEmbedding, vehicle.embedding),
-    }))
-    .filter((v) => v.similarity >= minSimilarity)
-    .sort((a, b) => b.similarity - a.similarity);
 
-  return { topPeople, topVehicles };
+/**
+ * Searches for people and vehicles based on the query and sensitivity.
+ * @param query 
+ * @param sensitivity 
+ * @returns 
+ */
+export const searchPeopleAndVehicles = async (
+  query: string,
+  sensitivity: number = 0.7
+): Promise<MatchedPerson[]> => {
+  const embedding = await generateEmbedding(query);
+
+  const people = await PersonModel.find({
+    crimeHistory: { $exists: true, $not: { $size: 0 } },
+  });
+  const vehicles = await VehicleModel.find({});
+
+  const results: MatchedPerson[] = people
+    .map((person): MatchedPerson => {
+      const score = cosineSimilarity(embedding, person.embedding);
+      return {
+        _id: person._id.toString(),
+        name: person.name,
+        age: person.age,
+        description: person.description,
+        crimeHistory: person.crimeHistory,
+        similarity: score,
+        vehicleBoost: 0,
+        finalScore: score,
+        matchedVehicles: [],
+      };
+    })
+    .filter((p) => p.similarity >= sensitivity);
+
+  for (const person of results) {
+    const linkedVehicles = vehicles.filter(
+      (v) => v.registeredTo?.toString() === person._id || v.isStolen
+    );
+
+    for (const vehicle of linkedVehicles) {
+      const sim = cosineSimilarity(embedding, vehicle.embedding);
+      if (sim >= sensitivity) {
+        person.vehicleBoost = Math.max(person.vehicleBoost, sim * 0.2);
+        person.finalScore += sim * 0.2;
+
+        person.matchedVehicles.push({
+          _id: vehicle._id.toString(),
+          make: vehicle.make,
+          model: vehicle.model,
+          color: vehicle.color,
+          similarity: sim,
+          isStolen: vehicle.isStolen,
+        });
+      }
+    }
+  }
+
+  return results.sort((a, b) => b.finalScore - a.finalScore).slice(0, 5);
+};
+
+
+export const classifyDescription = async (
+  input: string
+): Promise<DescriptionType> => {
+  const prompt = `
+You are a classifier that decides whether a description is about a person, a vehicle, or both.
+Respond with only one word: "person", "vehicle", or "both".
+
+Description: "${input}"
+`;
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [{ role: "user", content: prompt }],
+    temperature: 0,
+  });
+
+  const result = response.choices[0].message.content?.trim().toLowerCase();
+
+  if (result === "person" || result === "vehicle" || result === "both") {
+    return result as DescriptionType;
+  }
+
+  throw new Error(`Invalid classification result: ${result}`);
 };

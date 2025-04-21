@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { VehicleModel } from "../models/vehicleModel";
 
-export const getAllVehicles = async (req: Request, res: Response) => {
+export const getAllVehicles = async (req: Request, res: Response): Promise<void> => {
   try {
     const vehicles = await VehicleModel.find({});
     res.json(vehicles);
