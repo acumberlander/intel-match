@@ -1,30 +1,31 @@
-import React from 'react'
-import { Vehicle } from '../types/Vehicle'
-import { SearchResult } from '../types/SearchResult'
+"use client";
+import React from "react";
+import { Vehicle } from "../types/Vehicle";
 
 interface VehicleListProps {
-  vehicles: Vehicle[] | SearchResult[];
+  vehicles: Vehicle[];
 }
 
 const VehicleList = ({vehicles}: VehicleListProps) => {
+  if (!vehicles?.length) return null;
+
   return (
-    <div className="max-w-lg">
-      <ul className="space-y-2">
-        {vehicles.map((v) => (
-          <li key={v.id} className="border p-3 rounded bg-gray-50">
-            <p>
-              <strong>
-                {v.make} {v.model}
-              </strong>{" "}
-              ({v.color})
+    <div className="space-y-6">
+      {vehicles.map((vehicle) => (
+        <div key={vehicle._id} className="border p-4 rounded bg-white shadow">
+          <p className="font-semibold text-lg">
+            {vehicle.make} {vehicle.model} ({vehicle.color})
+          </p>
+          <p className="text-sm text-gray-700 italic mt-1">
+            Similarity: {(vehicle.similarity * 100).toFixed(1)}%
+          </p>
+          {vehicle.isStolen && (
+            <p className="text-red-500 text-sm font-semibold">
+              Reported Stolen
             </p>
-            <p className="text-sm">{v.description}</p>
-            <p className="text-xs text-gray-500">
-              Similarity: {v.similarity?.toFixed(3)}
-            </p>
-          </li>
-        ))}
-      </ul>
+          )}
+        </div>
+      ))}
     </div>
   );
 }

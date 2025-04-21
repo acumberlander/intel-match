@@ -1,8 +1,14 @@
+import { Crime } from "./Crime";
+import { MatchedVehicle } from "./Vehicle";
+
 export type Person = {
-  id: string;
+  _id: string;
   name: string;
-  age: number;
+  age?: number | null;
   description: string;
-  embedding: number[];
-  similarity?: number;
+  crimeHistory: Crime[] | string[];
+  similarity: number;
+  vehicleBoost?: number;
+  finalScore?: number;
+  matchedVehicles?: MatchedVehicle[];
 };

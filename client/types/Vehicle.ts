@@ -1,9 +1,17 @@
 export type Vehicle = {
-  id: string;
+  _id: string;
   make: string;
   model: string;
   color: string;
-  description: string;
-  embedding: number[];
-  similarity?: number;
+  similarity: number;
+  isStolen?: boolean;
+};
+
+export type MatchedVehicle = {
+  _id: string;
+  make: string;
+  model: string;
+  color: string;
+  similarity: number;
+  isStolen?: boolean;
 };
